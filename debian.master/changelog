@@ -1,10 +1,6 @@
-<<<<<<< HEAD
-linux (5.4-8.1) unstable; urgency=low
-=======
 linux (5.5-6.1) unstable; urgency=low
->>>>>>> df3ca4cc653f... fix
 
-DO 5.4.12 kernel with core scheduling
+  DO 5.5 kernel with core scheduling
 
  -- Vineeth Remanan Pillai <vpillai@digitalocean.com>  Mon, 04 Nov 2019 15:57:47 +0000
 

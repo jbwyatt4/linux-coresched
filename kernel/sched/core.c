@@ -106,17 +106,23 @@ static inline bool prio_less(struct task_struct *a, struct task_struct *b)
 		return !dl_time_before(a->dl.deadline, b->dl.deadline);
 
 	if (pa == MAX_RT_PRIO + MAX_NICE)  { /* fair */
-		u64 vruntime = b->se.vruntime;
+		u64 a_vruntime = a->se.vruntime;
+		u64 b_vruntime = b->se.vruntime;
 
 		/*
 		 * Normalize the vruntime if tasks are in different cpus.
 		 */
 		if (task_cpu(a) != task_cpu(b)) {
-			vruntime -= task_cfs_rq(b)->min_vruntime;
-			vruntime += task_cfs_rq(a)->min_vruntime;
+			b_vruntime -= task_cfs_rq(b)->min_vruntime;
+			b_vruntime += task_cfs_rq(a)->min_vruntime;
+
+			trace_printk("(%d:%Lu,%Lu,%Lu) <> (%d:%Lu,%Lu,%Lu)\n",
+				     a->pid, a_vruntime, a->se.vruntime, task_cfs_rq(a)->min_vruntime,
+				     b->pid, b_vruntime, b->se.vruntime, task_cfs_rq(b)->min_vruntime);
+
 		}
 
-		return !((s64)(a->se.vruntime - vruntime) <= 0);
+		return !((s64)(a_vruntime - b_vruntime) <= 0);
 	}
 
 	return false;
@@ -3662,8 +3668,10 @@ pick_task(struct rq *rq, const struct sched_class *class, struct task_struct *ma
 		 * If class_pick is tagged, return it only if it has
 		 * higher priority than max.
 		 */
-		if (max && class_pick->core_cookie &&
-		    prio_less(class_pick, max))
+		bool max_is_higher = sched_feat(CORESCHED_STALL_FIX) ?
+				     max && !prio_less(max, class_pick) :
+				     max && prio_less(class_pick, max);
+		if (class_pick->core_cookie && max_is_higher)
 			return idle_sched_class.pick_task(rq);
 
 		return class_pick;

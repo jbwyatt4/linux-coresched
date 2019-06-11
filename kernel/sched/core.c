@@ -286,6 +286,57 @@ void sched_core_put(void)
 	mutex_unlock(&sched_core_mutex);
 }
 
+static char * coresched_mode_str[] = {
+	"cgroup",
+	"vm",
+	NULL
+};
+
+static coresched_mode_t coresched_mode = CORESCHED_MODE_CGROUP;
+ssize_t sched_core_set_mode(const char *mode_str, size_t count)
+{
+	int ret = -EINVAL;
+	int mode = CORESCHED_MODE_CGROUP;
+
+	mutex_lock(&sched_core_mutex);
+	while (mode < CORESCHED_MODE_MAX) {
+		if (count == strlen(coresched_mode_str[mode]) &&
+		    strncmp(coresched_mode_str[mode], mode_str, count) == 0) {
+			if (mode == coresched_mode) {
+				ret = count;
+			} else if (sched_core_count) {
+				ret = -EBUSY;
+			} else {
+				coresched_mode = mode;
+				ret = count;
+			}
+			break;
+		}
+
+		mode++;
+	}
+
+	mutex_unlock(&sched_core_mutex);
+	return ret;
+}
+EXPORT_SYMBOL(sched_core_set_mode);
+
+coresched_mode_t sched_core_get_mode(void)
+{
+	coresched_mode_t mode;
+	mutex_lock(&sched_core_mutex);
+	mode = coresched_mode;
+	mutex_unlock(&sched_core_mutex);
+	return mode;
+}
+EXPORT_SYMBOL(sched_core_get_mode);
+
+const char *sched_core_get_mode_str(void)
+{
+	return coresched_mode_str[sched_core_get_mode()];
+}
+EXPORT_SYMBOL(sched_core_get_mode_str);
+
 #else /* !CONFIG_SCHED_CORE */
 
 static inline void sched_core_enqueue(struct rq *rq, struct task_struct *p) { }

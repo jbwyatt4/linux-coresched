@@ -184,6 +184,21 @@ static ssize_t rcu_normal_store(struct kobject *kobj,
 KERNEL_ATTR_RW(rcu_normal);
 #endif /* #ifndef CONFIG_TINY_RCU */
 
+#ifdef CONFIG_SCHED_CORE
+static ssize_t coresched_mode_show(struct kobject *kobj,
+				   struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%s\n", sched_core_get_mode_str());
+}
+static ssize_t coresched_mode_store(struct kobject *kobj,
+				    struct kobj_attribute *attr,
+				    const char *buf, size_t count)
+{
+	return sched_core_set_mode(buf, count - 1);
+}
+KERNEL_ATTR_RW(coresched_mode);
+#endif
+
 /*
  * Make /sys/kernel/notes give the raw contents of our kernel .notes section.
  */
@@ -230,6 +245,9 @@ static struct attribute * kernel_attrs[] = {
 #ifndef CONFIG_TINY_RCU
 	&rcu_expedited_attr.attr,
 	&rcu_normal_attr.attr,
+#endif
+#ifdef CONFIG_SCHED_CORE
+	&coresched_mode_attr.attr,
 #endif
 	NULL
 };

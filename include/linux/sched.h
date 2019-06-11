@@ -1224,6 +1224,21 @@ struct task_struct {
 	 */
 };
 
+#ifdef CONFIG_SCHED_CORE
+typedef enum {
+	CORESCHED_MODE_CGROUP = 0,
+	CORESCHED_MODE_VM,
+	CORESCHED_MODE_MAX
+} coresched_mode_t;
+
+void sched_core_get(void);
+void sched_core_put(void);
+
+ssize_t sched_core_set_mode(const char *, size_t);
+const char *sched_core_get_mode_str(void);
+coresched_mode_t sched_core_get_mode(void);
+#endif
+
 static inline struct pid *task_pid(struct task_struct *task)
 {
 	return task->thread_pid;

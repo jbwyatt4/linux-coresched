@@ -7650,6 +7650,9 @@ static int cpu_core_tag_write_u64(struct cgroup_subsys_state *css, struct cftype
 	if (val > 1)
 		return -ERANGE;
 
+	if (coresched_mode != CORESCHED_MODE_CGROUP)
+		return -EINVAL;
+
 	if (!static_branch_likely(&sched_smt_present))
 		return -EINVAL;
 

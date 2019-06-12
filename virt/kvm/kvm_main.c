@@ -756,6 +756,13 @@ static void kvm_destroy_vm(struct kvm *kvm)
 	preempt_notifier_dec();
 	hardware_disable_all();
 	mmdrop(mm);
+#ifdef CONFIG_SCHED_CORE
+	if (sched_core_get_mode() == CORESCHED_MODE_VM) {
+		current->group_leader->core_cookie = 0UL;
+		current->core_cookie = 0UL;
+		sched_core_put();
+	}
+#endif
 }
 
 void kvm_get_kvm(struct kvm *kvm)
@@ -3338,6 +3345,13 @@ static int kvm_dev_ioctl_create_vm(unsigned long type)
 	kvm = kvm_create_vm(type);
 	if (IS_ERR(kvm))
 		return PTR_ERR(kvm);
+#ifdef CONFIG_SCHED_CORE
+	if (sched_core_get_mode() == CORESCHED_MODE_VM) {
+		sched_core_get();
+		current->core_cookie = (unsigned long)kvm;
+		current->group_leader->core_cookie = (unsigned long)kvm;
+	}
+#endif
 #ifdef CONFIG_KVM_MMIO
 	r = kvm_coalesced_mmio_init(kvm);
 	if (r < 0)

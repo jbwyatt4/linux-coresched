@@ -277,6 +277,7 @@ void sched_core_get(void)
 		__sched_core_enable();
 	mutex_unlock(&sched_core_mutex);
 }
+EXPORT_SYMBOL(sched_core_get);
 
 void sched_core_put(void)
 {
@@ -285,6 +286,7 @@ void sched_core_put(void)
 		__sched_core_disable();
 	mutex_unlock(&sched_core_mutex);
 }
+EXPORT_SYMBOL(sched_core_put);
 
 static char * coresched_mode_str[] = {
 	"cgroup",

@@ -746,6 +746,26 @@ static void kvm_destroy_vm(struct kvm *kvm)
 #else
 	kvm_arch_flush_shadow_all(kvm);
 #endif
+#ifdef CONFIG_SCHED_CORE
+	if (sched_core_get_mode() == CORESCHED_MODE_VM) {
+		struct task_struct *p;
+
+		printk("kvm userspace pid: %d\n", kvm->userspace_pid);
+		p = pid_task(find_get_pid(kvm->userspace_pid), PIDTYPE_PID);
+		if (!p) {
+			printk("ERR: failed to find task for PID %d\n", kvm->userspace_pid);
+		} else {
+			printk("Clearing coresched tag %lu for %d\n", p->core_cookie, p->pid);
+			if (!p->core_cookie) {
+				printk("ERR: VM %d was running untagged\n");
+			} else {
+				p->group_leader->core_cookie = 0UL;
+				p->core_cookie = 0UL;
+				sched_core_put();
+			}
+		}
+	}
+#endif
 	kvm_arch_destroy_vm(kvm);
 	kvm_destroy_devices(kvm);
 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++)
@@ -756,13 +776,6 @@ static void kvm_destroy_vm(struct kvm *kvm)
 	preempt_notifier_dec();
 	hardware_disable_all();
 	mmdrop(mm);
-#ifdef CONFIG_SCHED_CORE
-	if (sched_core_get_mode() == CORESCHED_MODE_VM) {
-		current->group_leader->core_cookie = 0UL;
-		current->core_cookie = 0UL;
-		sched_core_put();
-	}
-#endif
 }
 
 void kvm_get_kvm(struct kvm *kvm)
@@ -3348,8 +3361,9 @@ static int kvm_dev_ioctl_create_vm(unsigned long type)
 #ifdef CONFIG_SCHED_CORE
 	if (sched_core_get_mode() == CORESCHED_MODE_VM) {
 		sched_core_get();
-		current->core_cookie = (unsigned long)kvm;
-		current->group_leader->core_cookie = (unsigned long)kvm;
+		printk("Tagging %d with coresched tag %lu\n", current->pid, (unsigned long) kvm);
+		current->core_cookie = (unsigned long) kvm;
+		current->group_leader->core_cookie = (unsigned long) kvm;
 	}
 #endif
 #ifdef CONFIG_KVM_MMIO

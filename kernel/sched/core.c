@@ -301,23 +301,25 @@ ssize_t sched_core_set_mode(const char *mode_str, size_t count)
 	int mode = CORESCHED_MODE_CGROUP;
 
 	mutex_lock(&sched_core_mutex);
-	while (mode < CORESCHED_MODE_MAX) {
-		if (count == strlen(coresched_mode_str[mode]) &&
-		    strncmp(coresched_mode_str[mode], mode_str, count) == 0) {
-			if (mode == coresched_mode) {
-				ret = count;
-			} else if (sched_core_count) {
-				ret = -EBUSY;
-			} else {
-				coresched_mode = mode;
-				ret = count;
-			}
-			break;
-		}
 
-		mode++;
+	if (sched_core_count) {
+		ret = -EBUSY;
+		printk("Cannot change mode when core scheduling is enabled\n");
+		goto end;
 	}
 
+	for (mode = CORESCHED_MODE_CGROUP; mode < CORESCHED_MODE_MAX; mode++) {
+		if (count != strlen(coresched_mode_str[mode]) ||
+			strncmp(coresched_mode_str[mode], mode_str, count) != 0) {
+			continue;
+		}
+		coresched_mode = mode;
+		ret = count + 1;
+		printk("switching to mode %d\n", mode);
+		break;
+	}
+
+end:
 	mutex_unlock(&sched_core_mutex);
 	return ret;
 }

@@ -521,6 +521,15 @@ long vhost_dev_set_owner(struct vhost_dev *dev)
 	if (err)
 		goto err_cgroup;
 
+#ifdef CONFIG_SCHED_CORE
+	if (sched_core_get_mode() == CORESCHED_MODE_VM) {
+		sched_core_get();
+		printk("Tagging vhost thread %d with coresched tag %lu\n", worker->pid, current->core_cookie);
+		worker->core_cookie = current->core_cookie;
+		worker->group_leader->core_cookie = current->core_cookie;
+	}
+#endif
+
 	return 0;
 err_cgroup:
 	kthread_stop(worker);
@@ -638,6 +647,14 @@ void vhost_dev_cleanup(struct vhost_dev *dev)
 	wake_up_interruptible_poll(&dev->wait, EPOLLIN | EPOLLRDNORM);
 	WARN_ON(!llist_empty(&dev->work_list));
 	if (dev->worker) {
+#ifdef CONFIG_SCHED_CORE
+		if (sched_core_get_mode() == CORESCHED_MODE_VM) {
+			printk("Clearing vhost coresched tag %lu for %d\n", dev->worker->core_cookie, dev->worker->pid);
+			dev->worker->group_leader->core_cookie = 0UL;
+			dev->worker->core_cookie = 0UL;
+			sched_core_put();
+		}
+#endif
 		kthread_stop(dev->worker);
 		dev->worker = NULL;
 	}

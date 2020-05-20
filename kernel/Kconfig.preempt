@@ -86,3 +86,16 @@ config SCHED_CORE
 	default y
 	depends on SCHED_SMT
 
+config SCHED_CORE_IRQ_PAUSE
+	bool "Pause siblings on entering irq/softirq during core-scheduling"
+	default y
+	depends on SCHED_CORE
+	help
+	  This option enables pausing all SMT siblings of a core when atleast
+	  one of the siblings in the core is in nmi/irq/softirq. This is to
+	  enforce security such that information from kernel is not leaked to
+	  non-trusted tasks running on siblings. This option is valid only if
+	  Core Scheduling(CONFIG_SCHED_CORE) is enabled.
+
+	  If in doubt, select 'Y' when CONFIG_SCHED_CORE=y
+

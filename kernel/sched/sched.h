@@ -1041,11 +1041,18 @@ struct rq {
 	unsigned int		core_sched_seq;
 	struct rb_root		core_tree;
 	unsigned char		core_forceidle;
+	unsigned char		core_pause_pending;
+#ifdef CONFIG_SCHED_CORE_IRQ_PAUSE
+	unsigned int		core_this_irq_nest;
+#endif
 
 	/* shared state */
 	unsigned int		core_task_seq;
 	unsigned int		core_pick_seq;
 	unsigned long		core_cookie;
+#ifdef CONFIG_SCHED_CORE_IRQ_PAUSE
+	unsigned int		core_irq_nest;
+#endif
 #endif
 };
 

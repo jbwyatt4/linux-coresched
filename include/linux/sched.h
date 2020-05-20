@@ -2025,4 +2025,9 @@ int sched_trace_rq_cpu(struct rq *rq);
 
 const struct cpumask *sched_trace_rd_span(struct root_domain *rd);
 
+#ifdef CONFIG_SCHED_CORE_IRQ_PAUSE
+void sched_core_irq_enter(void);
+void sched_core_irq_exit(void);
+#endif
+
 #endif

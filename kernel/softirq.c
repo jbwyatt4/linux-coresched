@@ -246,6 +246,24 @@ static inline bool lockdep_softirq_start(void) { return false; }
 static inline void lockdep_softirq_end(bool in_hardirq) { }
 #endif
 
+#ifdef CONFIG_SCHED_CORE_IRQ_PAUSE
+DEFINE_STATIC_KEY_TRUE(sched_core_irq_pause);
+static int __init set_sched_core_irq_pause(char *str)
+{
+	unsigned long val = 0;
+	if (!str)
+		return 0;
+
+	val = simple_strtoul(str, &str, 0);
+
+	if (val == 0)
+		static_branch_disable(&sched_core_irq_pause);
+
+	return 1;
+}
+__setup("sched_core_irq_pause=", set_sched_core_irq_pause);
+#endif
+
 asmlinkage __visible void __softirq_entry __do_softirq(void)
 {
 	unsigned long end = jiffies + MAX_SOFTIRQ_TIME;
@@ -272,6 +290,16 @@ asmlinkage __visible void __softirq_entry __do_softirq(void)
 restart:
 	/* Reset the pending bitmask before enabling irqs */
 	set_softirq_pending(0);
+
+#ifdef CONFIG_SCHED_CORE_IRQ_PAUSE
+	/*
+	 * Core scheduling mitigations require entry into softirq to send stall
+	 * IPIs to sibling hyperthreads if needed (ex, sibling is running
+	 * untrusted task). If we are here from irq_exit(), no IPIs are sent.
+	 */
+	if (static_branch_likely(&sched_core_irq_pause))
+		sched_core_irq_enter();
+#endif
 
 	local_irq_enable();
 
@@ -304,6 +332,12 @@ restart:
 	if (__this_cpu_read(ksoftirqd) == current)
 		rcu_softirq_qs();
 	local_irq_disable();
+
+#ifdef CONFIG_SCHED_CORE_IRQ_PAUSE
+	/* Inform the scheduler about exit from softirq. */
+	if (static_branch_likely(&sched_core_irq_pause))
+		sched_core_irq_exit();
+#endif
 
 	pending = local_softirq_pending();
 	if (pending) {
@@ -345,6 +379,12 @@ asmlinkage __visible void do_softirq(void)
 void irq_enter(void)
 {
 	rcu_irq_enter();
+
+#ifdef CONFIG_SCHED_CORE_IRQ_PAUSE
+	if (static_branch_likely(&sched_core_irq_pause))
+		sched_core_irq_enter();
+#endif
+
 	if (is_idle_task(current) && !in_interrupt()) {
 		/*
 		 * Prevent raise_softirq from needlessly waking up ksoftirqd
@@ -413,6 +453,12 @@ void irq_exit(void)
 		invoke_softirq();
 
 	tick_irq_exit();
+
+#ifdef CONFIG_SCHED_CORE_IRQ_PAUSE
+	if (static_branch_likely(&sched_core_irq_pause))
+		sched_core_irq_exit();
+#endif
+
 	rcu_irq_exit();
 	 /* must be last! */
 	lockdep_hardirq_exit();

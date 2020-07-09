@@ -7353,20 +7353,24 @@ int sched_cpu_starting(unsigned int cpu)
 	struct rq *rq, *core_rq = NULL;
 	int i;
 
-	for_each_cpu(i, smt_mask) {
-		rq = cpu_rq(i);
-		if (rq->core && rq->core == rq)
-			core_rq = rq;
-	}
+	core_rq = cpu_rq(cpu)->core;
 
-	if (!core_rq)
-		core_rq = cpu_rq(cpu);
+	if (!core_rq) {
+		for_each_cpu(i, smt_mask) {
+			rq = cpu_rq(i);
+			if (rq->core && rq->core == rq)
+				core_rq = rq;
+		}
 
-	for_each_cpu(i, smt_mask) {
-		rq = cpu_rq(i);
+		if (!core_rq)
+			core_rq = cpu_rq(cpu);
 
-		WARN_ON_ONCE(rq->core && rq->core != core_rq);
-		rq->core = core_rq;
+		for_each_cpu(i, smt_mask) {
+			rq = cpu_rq(i);
+
+			WARN_ON_ONCE(rq->core && rq->core != core_rq);
+			rq->core = core_rq;
+		}
 	}
 
 	printk("core: %d -> %d\n", cpu, cpu_of(core_rq));

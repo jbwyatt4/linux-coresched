@@ -4476,9 +4476,9 @@ pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 	 * pointers are all still valid), and we haven't scheduled the last
 	 * pick yet, do so now.
 	 */
-	if (rq->core->core_pick_seq == rq->core->core_task_seq &&
-	    rq->core->core_pick_seq != rq->core_sched_seq) {
-		WRITE_ONCE(rq->core_sched_seq, rq->core->core_pick_seq);
+	if (rq->core_pick_seq == rq->core->core_task_seq &&
+	    rq->core_pick_seq != rq->core_sched_seq) {
+		WRITE_ONCE(rq->core_sched_seq, rq->core_pick_seq);
 
 		next = rq->core_pick;
 		if (next != prev) {
@@ -4488,7 +4488,7 @@ pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 
 		trace_printk("pick pre selected (%u %u %u): %s/%d %lx\n",
 			     rq->core->core_task_seq,
-			     rq->core->core_pick_seq,
+			     rq->core_pick_seq,
 			     rq->core_sched_seq,
 			     next->comm, next->pid,
 			     next->core_cookie);
@@ -4502,7 +4502,7 @@ pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 	smt_mask = cpu_smt_mask(cpu);
 
 	/*
-	 * core->core_task_seq, core->core_pick_seq, rq->core_sched_seq
+	 * core->core_task_seq, rq->core_pick_seq, rq->core_sched_seq
 	 *
 	 * @task_seq guards the task state ({en,de}queues)
 	 * @pick_seq is the @task_seq we did a selection on
@@ -4519,7 +4519,10 @@ pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 	for_each_cpu_or(i, smt_mask, cpumask_of(cpu)) {
 		struct rq *rq_i = cpu_rq(i);
 
-		rq_i->core_pick = NULL;
+		if (rq_i->core_pick) {
+			WRITE_ONCE(rq_i->core_sched_seq, rq_i->core_pick_seq);
+			rq_i->core_pick = NULL;
+		}
 
 		if (rq_i->core_forceidle) {
 			need_sync = true;
@@ -4623,9 +4626,7 @@ again:
 next_class:;
 	}
 
-	rq->core->core_pick_seq = rq->core->core_task_seq;
 	next = rq->core_pick;
-	rq->core_sched_seq = rq->core->core_pick_seq;
 
 	/* Something should have been selected for current CPU */
 	WARN_ON_ONCE(!next);
@@ -4653,6 +4654,7 @@ next_class:;
 			continue;
 
 		if (rq_i->curr != rq_i->core_pick) {
+			WRITE_ONCE(rq_i->core_pick_seq, rq->core->core_task_seq);
 			trace_printk("IPI(%d)\n", i);
 			resched_curr(rq_i);
 		}

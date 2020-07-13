@@ -4277,6 +4277,8 @@ static inline void sched_core_sibling_irq_pause(struct rq *rq)
 	 */
 	while (smp_load_acquire(&rq->core->core_irq_nest) > 0)
 		cpu_relax();
+
+	trace_printk("irq_pause: finished waiting on irq\n");
 }
 
 /*
@@ -4393,7 +4395,12 @@ void sched_core_irq_exit(void)
 		 * there for ->core_irq_nest to reach 0. If not, just wait here.
 		 */
 		if (!tif_need_resched()) {
-			wait_here = true;
+			if (sched_feat(CORESCHED_WAIT_IRQ_EXIT)) {
+				wait_here = true;
+			} else {
+				trace_printk("irq_pause: forcing a reschedule\n");
+				resched_curr(rq);
+			}
 		}
 	}
 
@@ -4404,8 +4411,10 @@ void sched_core_irq_exit(void)
 	smp_store_release(&rq->core->core_irq_nest, nest - 1);
 	raw_spin_unlock(rq_lockp(rq));
 
-	if (wait_here)
+	if (wait_here) {
+		trace_printk("irq_pause: waiting on irq_exit\n");
 		sched_core_sibling_irq_pause(rq);
+	}
 }
 #endif /* CONFIG_SCHED_CORE_IRQ_PAUSE */
 
@@ -4927,8 +4936,10 @@ static void __sched notrace __schedule(bool preempt)
 	 * the services of irq_exit() to do that waiting.
 	 */
 	if (sched_core_enabled(rq) &&
-	    !is_idle_task(next) && next->mm && next->core_cookie)
+	    !is_idle_task(next) && next->mm && next->core_cookie) {
+		trace_printk("irq_pause: waiting on irq from scheduler\n");
 		sched_core_sibling_irq_pause(rq);
+	}
 #endif
 
 	balance_callback(rq);
